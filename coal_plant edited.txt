@@ -1,0 +1,132 @@
+Model
+  Parameters
+
+    ! Parameters
+    FD_rate = 62.6       ! Forced Draft motor speed (%)
+    V = 70630            ! Volume of boiler (ft^3)
+    A_bed=2153           ! Area of the bed (ft^2)    
+
+    MW_water = 28.01     ! Molecular weight of water(kg/kmol)
+    Cp_water = .6427     ! Heat capacity of Water @ 300K (BTU/lb-deg F)
+    Q_water = 903420     ! Flow rate of water (lb/hr)
+    T_water_in = 348.96  ! Water temp in (deg F)
+
+    Cp_boiler = .11      ! Heat capacity of Carbon Steel (BTU/lb-deg F)
+    M_boiler = 200000    ! Mass of the boiler (lb)
+    
+    S1 = 5000/65         ! Constant relating stoker rate to coal flowrate (lb/hr-%)
+    A1 = 60000/62.6      ! Constant relating Forced Draft motor speed to air mass flow rate (lb/hr-%)
+
+    x_ash = .1           ! Percent uncombusted material in coal
+    Cp_coal = .29        ! Heat capacity of coal (BTU/lb-deg F)
+    
+    MW_air = 28.96       ! Molecular weight of air (kg/kmol)
+    Cp_air = .2392       ! Heat capacity of air (BTU/lb-deg F)
+
+    Cp_ash = .29         ! Heat capacity of ash (BTU/lb-deg F)
+    T_ash = 70           ! Temperature of ash (deg F)
+ 
+    Cp_flue = .247       ! Heat capacity of flue gas (BTU/lb-deg F)
+
+    h_comb = 10000       ! Heat of combustion of coal (BTU/lb)
+    
+    UA = 5e4             ! Overall heat transfer coefficient 
+    T_amb = 66.82        ! Ambient Temperature (deg F) 
+  
+    tau_lag = 3/60       ! lag tau*10 = time delay
+
+    eps = .7             ! Emissivity constant (1=black body)
+    sigma=4.756e-13      ! Stephan's constant (Btu/s-ft^2-deg F^4)
+    
+    T_bed=2300 !(deg F) 
+    h_bar=.039 !(Btu/s-ft^2-deg F)
+
+    kc = 1
+    taui = 1
+    taud = 0
+    sp = 400
+  End Parameters
+
+  Variables
+    ! Manipulated Variables
+    S_rate = 64.89       ! Stoker rate (%)
+
+    ! Differential States
+    M_bed = 60000          ! Mass of bed (tons)
+    T_boiler = 1000        ! Temperature of Boiler (°F)
+    T_water_out = 399.45   ! Water temp out (°F)
+    x[1:25]                ! lagged variables 
+    M_comb
+    M_coal
+    T_rate 
+    yInt = 0
+  End Variables
+
+  Intermediates
+    M_air  = A1 * FD_rate                     ! Mass flow rate of air (lbs/hr)
+   
+    M_ash  = x_ash * M_coal                   ! Mass flow rate of ash (lbs/hr)
+    M_flue = M_air + (1 - x_ash) * M_coal     ! Mass flow rate of flue gas (lb/hr)
+    x[0] = M_coal
+    
+    Q_comb = M_comb*h_comb
+
+    !T_flue = 447.77      ! Temperature of flue gas (deg F)     
+    T_flue=T_boiler
+    
+    !Q_rad = A_bed*eps*sigma*(T_bed^4-T_water_out)
+    !Q_conv = h_bar*A_bed*(T_flue-T_water_out)
+    Q_rad = 0.7 * Q_comb
+    Q_conv = 0
+
+    M_water = 10000 ! lb
+
+    error = SP - T_water_out
+  End Intermediates
+  
+
+  Equations
+    ! note: the $ denotes time differential
+    !  (e.g. $x is dx/dt)
+
+    ! overall mass balance 
+    !$M_bed = M_coal + M_air - M_ash -M_flue
+  
+    M_bed = 60000
+
+    ! energy balance
+    M_boiler*Cp_boiler*$T_boiler = M_coal*Cp_coal*(T_amb-T_boiler) + &
+                                   M_air*Cp_air*(T_amb-T_boiler) + &
+                                   Q_comb - Q_rad - Q_conv
+     
+    M_water*Cp_water*$T_water_out = Q_rad + Q_conv + Q_water*Cp_water*(T_water_in - T_water_out)
+
+    tau_lag*$x[1:25] = -x[1:25] + x[0:24]
+
+    M_comb = x[25]
+
+    M_coal = S1 * S_rate                      ! Mass flow rate of coal (tons/hr)
+
+    T_rate = $T_boiler
+
+    S_rate = 65 + kc * error + yInt - kc * taud * $T_water_out
+    $yInt = (kc/taui) * error 
+
+  End Equations
+
+End Model
+
+
+
+
+File *.plt
+  New Trend
+     M_comb
+     M_coal
+  New Trend
+     T_water_out
+     T_water_in
+  New Trend
+     sp
+	 T_water_out
+End File
